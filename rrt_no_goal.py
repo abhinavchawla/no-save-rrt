@@ -6,6 +6,8 @@ from matplotlib.collections import LineCollection, PatchCollection
 from matplotlib.path import Path
 import time
 
+from scipy import stats, integrate
+
 
 class Artists:
     'artists for animating tree search'
@@ -102,6 +104,7 @@ class RRT:
         self.path_length = 0
         self.time_taken = 0
         self.root = TreeNode(self.start, None)
+        self.normal_distribution_array = []
 
         self.fig = plt.figure()
         self.ax = plt.axes(xlim=(0, 1), ylim=(0, 1))
@@ -210,7 +213,6 @@ class RRT:
         if not self.path_found:
             random_pt, nearest_node, new_node = self.iterate()
             print('iteration: ', i, 'test_pts found: ', self.cnt)
-            self.test_points_found_count.append(self.cnt)
             self.artists.update_rand_pt_marker(random_pt)
             if new_node and nearest_node:
                 self.artists.update_obs_solid_lines(nearest_node, new_node)
@@ -246,6 +248,20 @@ class RRT:
                     else:
                         tmp.append(pt)
                 self.test_points = tmp
+                self.test_points_found_count.append(self.cnt)
+                variance = np.identity(len(new_node.pos))
+                self.normal_distribution_array.append(self.create_normal_distribution(new_node.pos, variance))
+                print("AREA UNDER THE CURVE: ", integrate.dblquad(self.max_value_normal_distribution_function, 0, 1, lambda x: 0, lambda x: 1))
+
+    def max_value_normal_distribution_function(self, y, x):
+        val = -np.inf
+        for distribution in self.normal_distribution_array:
+            val = max(val, distribution.pdf((x,y)))
+        return val
+
+    def create_normal_distribution(self, mean, std):
+        'create normal distribution'
+        return stats.multivariate_normal(mean, std)
 
 
 class RRT_Opt(RRT):
