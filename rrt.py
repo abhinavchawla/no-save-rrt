@@ -1,4 +1,3 @@
-
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import animation
@@ -11,7 +10,7 @@ import time
 class Artists:
     'artists for animating tree search'
 
-    def  __init__(self, ax):
+    def __init__(self, ax):
         self.artist_list = []
         self.ax = ax
         self.rand_pt_marker, = ax.plot([], [], '--o', color='lime', lw=1, zorder=1)
@@ -22,7 +21,6 @@ class Artists:
 
         self.root_pt_marker, = ax.plot([], [], '--o', color='blue', lw=1, zorder=2)
         self.artist_list.append(self.root_pt_marker)
-
 
         self.obs_solid_lines = LineCollection([], lw=2, animated=True, color='k', zorder=1)
         ax.add_collection(self.obs_solid_lines)
@@ -39,7 +37,7 @@ class Artists:
         ys = [rand_pt[1]]
 
         self.rand_pt_marker.set_data(xs, ys)
-    
+
     def update_goal_pt_marker(self, goal_pt):
         'update goal point marker'
 
@@ -47,7 +45,7 @@ class Artists:
         ys = [goal_pt[1]]
 
         self.goal_pt_marker.set_data(xs, ys)
-    
+
     def update_root_pt_marker(self, root_pt):
         'update root point marker'
 
@@ -55,13 +53,13 @@ class Artists:
         ys = [root_pt[1]]
 
         self.root_pt_marker.set_data(xs, ys)
-    
+
     def update_obs_solid_lines(self, old_pt, new_pt):
         codes = [Path.MOVETO, Path.LINETO]
         verts = [(new_pt.pos[0], new_pt.pos[1]), (old_pt.pos[0], old_pt.pos[1])]
         obs_solid_paths = self.obs_solid_lines.get_paths()
         obs_solid_paths.append(Path(verts, codes))
-    
+
     def update_circles(self, obstacles):
         for obs in obstacles:
             circle1 = plt.Circle((obs[0], obs[1]), 0.05, color='r')
@@ -72,9 +70,10 @@ class Artists:
         'update artist list'
         for i in range(len(path) - 1):
             codes = [Path.MOVETO, Path.LINETO]
-            verts = [(path[i][0], path[i][1]), (path[i+1][0], path[i+1][1])]
+            verts = [(path[i][0], path[i][1]), (path[i + 1][0], path[i + 1][1])]
             path_to_goal_paths = self.path_to_goal_lines.get_paths()
             path_to_goal_paths.append(Path(verts, codes))
+
 
 class TreeNode:
     def __init__(self, pos, parent):
@@ -84,6 +83,7 @@ class TreeNode:
         self.cost = 0
         self.path_cost = 0
         self.total_cost = 0
+
 
 class RRT:
     'RRT algorithm'
@@ -104,14 +104,13 @@ class RRT:
         self.ax = plt.axes(xlim=(0, 1), ylim=(0, 1))
         self.artists = Artists(self.ax)
         self.node_list = [self.root]
-        self.anim  = None
+        self.anim = None
         self.artists.update_root_pt_marker(self.start)
         self.artists.update_goal_pt_marker(self.goal)
         self.artists.update_circles(self.obstacle_list)
-        self.i=0
+        self.i = 0
         self.filename = filename
         print(self.filename)
-        
 
     def get_random_point(self):
         'get random point in random area'
@@ -142,11 +141,11 @@ class RRT:
     def steer(self, from_node, to_node):
         'steer from from_node to to_node'
 
-        theta = np.arctan2(to_node[1]-from_node.pos[1], to_node[0]-from_node.pos[0])
+        theta = np.arctan2(to_node[1] - from_node.pos[1], to_node[0] - from_node.pos[0])
         dist = np.linalg.norm(to_node - from_node.pos)
 
         if dist < self.step_size:
-            new_node = TreeNode(to_node, from_node) 
+            new_node = TreeNode(to_node, from_node)
         else:
             new_node = TreeNode(from_node.pos + self.step_size * np.array([np.cos(theta), np.sin(theta)]), from_node)
 
@@ -172,10 +171,10 @@ class RRT:
         new_node = self.steer(nearest_node, random_pt)
         if new_node:
             dist = self.get_dist(new_node, self.goal)
-            if dist<0.03:
+            if dist < 0.03:
                 self.update_path(new_node)
         return random_pt, nearest_node, new_node
-    
+
     def update_path(self, new_node):
         self.path_found = True
         self.path = self.get_path(new_node)
@@ -189,8 +188,10 @@ class RRT:
 
     def return_results(self):
         return self.path_found, self.path_length, self.time_taken, self.total_nodes
+
     def get_dist(self, node, goal):
         return np.linalg.norm(node.pos - goal)
+
     def get_path(self, node):
         'get path from root to node'
 
@@ -201,25 +202,25 @@ class RRT:
             path.append(node.pos)
 
         return path[::-1]
+
     def animate(self, i):
         'animation function'
         if not self.path_found:
             # print('iteration: ', i)
-            random_pt, nearest_node, new_node =self.iterate()
+            random_pt, nearest_node, new_node = self.iterate()
             self.artists.update_rand_pt_marker(random_pt)
             if new_node and nearest_node:
                 self.artists.update_obs_solid_lines(nearest_node, new_node)
         return self.artists.artist_list
-    
 
     def run(self):
         'run RRT algorithm'
         # plot root point (not animated)
         self.ax.plot([self.root.pos[0]], [self.root.pos[1]], 'ko', ms=5)
         self.start_time = time.time()
-        self.anim = animation.FuncAnimation(self.fig, self.animate, frames=self.max_iter,interval=1, blit=True)
+        self.anim = animation.FuncAnimation(self.fig, self.animate, frames=self.max_iter, interval=1, blit=True)
         self.anim.save(self.filename, fps=30, writer='imagemagick')
-    
+
 
 class RRT_Opt(RRT):
 
@@ -227,21 +228,23 @@ class RRT_Opt(RRT):
         super().__init__(start, goal, obstacle_list, rand_area, step_size, max_iter, filename)
         self.current_rand_pt = None
         self.old_node = self.root
+
     def iterate(self):
-        if self.current_rand_pt is None or self.current_node is None or self.get_dist(self.current_node, self.current_rand_pt) < 0.001:
+        if self.current_rand_pt is None or self.current_node is None or self.get_dist(self.current_node,
+                                                                                      self.current_rand_pt) < 0.001:
             self.current_rand_pt = self.get_random_point()
             self.current_node = self.get_nearest_node(self.current_rand_pt)
         self.old_node = self.current_node
         self.current_node = self.steer(self.current_node, self.current_rand_pt)
-        
+
         if self.current_node:
             dist = self.get_dist(self.current_node, self.goal)
-            if dist< 0.03:
+            if dist < 0.03:
                 self.update_path(self.current_node)
 
         return self.current_rand_pt, self.current_node, self.old_node
-        
-    
+
+
 def generate_random_point(search_space):
     x_min, x_max = search_space[0]
     y_min, y_max = search_space[1]
@@ -251,6 +254,7 @@ def generate_random_point(search_space):
 
     return np.array([x, y])
 
+
 def collision_check(node, obstacle_list):
     'check if node is in collision'
 
@@ -258,9 +262,13 @@ def collision_check(node, obstacle_list):
         if np.linalg.norm(node - obs) < 0.05:
             return False
     return True
+
+
 if __name__ == '__main__':
     search_space = np.array([[0, 1], [0, 1]])
-    obstacles = [(0.1, 0.2), (0.2, 0.3), (0.3, 0.4),(0.4, 0.5),[0.5,0.6],[0.6,0.7],[0.7,0.8],[0.8,0.9], (0.9,0.1),(0.8,0.2),(0.7,0.3),(0.6,0.4),(0.5,0.5),(0.4,0.6),(0.3,0.7),(0.2,0.8),(0.1,0.9)]
+    obstacles = [(0.1, 0.2), (0.2, 0.3), (0.3, 0.4), (0.4, 0.5), [0.5, 0.6], [0.6, 0.7], [0.7, 0.8], [0.8, 0.9],
+                 (0.9, 0.1), (0.8, 0.2), (0.7, 0.3), (0.6, 0.4), (0.5, 0.5), (0.4, 0.6), (0.3, 0.7), (0.2, 0.8),
+                 (0.1, 0.9)]
     path_found_rrt = []
     path_lengths_rrt = []
     time_taken_rrt = []
@@ -280,7 +288,7 @@ if __name__ == '__main__':
             print('goal in collision')
             goal = generate_random_point(search_space)
         print('Distance between start and goal ', np.linalg.norm(start - goal))
-        rrtsearch = RRT(start, goal, obstacles, search_space, 0.01, 5000, filename='cache/rrt_'+str(test)+'.gif')
+        rrtsearch = RRT(start, goal, obstacles, search_space, 0.01, 5000, filename='cache/rrt_' + str(test) + '.gif')
         rrtsearch.run()
 
         results = rrtsearch.return_results()
@@ -289,7 +297,8 @@ if __name__ == '__main__':
         time_taken_rrt.append(results[2])
         total_nodes_rrt.append(results[3])
 
-        rrtsearch2 = RRT_Opt(start, goal, obstacles, search_space, 0.01, 5000, filename='cache/rrt_opt_'+str(test)+'.gif')
+        rrtsearch2 = RRT_Opt(start, goal, obstacles, search_space, 0.01, 5000,
+                             filename='cache/rrt_opt_' + str(test) + '.gif')
         rrtsearch2.run()
 
         results = rrtsearch2.return_results()
@@ -298,13 +307,12 @@ if __name__ == '__main__':
         time_taken_rrt_opt.append(results[2])
         total_nodes_rrt_opt.append(results[3])
         print('test ', test)
-        print('path found: ',path_found_rrt)
+        print('path found: ', path_found_rrt)
         print('path lengths: ', path_lengths_rrt)
         print('time taken: ', time_taken_rrt)
         print('total nodes: ', total_nodes_rrt)
 
-        print('path found: ',path_found_rrt_opt)
+        print('path found: ', path_found_rrt_opt)
         print('path lengths: ', path_lengths_rrt_opt)
         print('time taken: ', time_taken_rrt_opt)
         print('total nodes: ', total_nodes_rrt_opt)
-
