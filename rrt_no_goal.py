@@ -170,14 +170,18 @@ class RRT:
 
     def steer(self, from_node, to_node):
         'steer from from_node to to_node'
-        cmd_from_parent = self.generate_command(from_node, to_node)
-        dist = cmd_from_parent[-1]
+
         self.actual_iterations_count += 1
+        dist = np.linalg.norm(to_node - from_node.pos)
+        unit_vector = (to_node- from_node.pos) / dist
+        cmd_from_parent = (unit_vector, dist)
+        dist = cmd_from_parent[-1]
 
         if dist < self.step_size:
             new_node = TreeNode(to_node, from_node, cmd_from_parent)
         else:
-            new_node = TreeNode(from_node.pos + self.convert_to_cartesian(cmd_from_parent), from_node, cmd_from_parent)
+            new_node = TreeNode(from_node.pos + self.step_size*unit_vector, from_node, cmd_from_parent)
+            # new_node = TreeNode(from_node.pos + self.convert_to_cartesian(cmd_from_parent), from_node, cmd_from_parent)
 
         if self.collision_check(new_node):
             from_node.children.append(new_node)
@@ -186,33 +190,7 @@ class RRT:
         else:
             return None
 
-    def generate_command(self, from_node, to_node):
-        if self.d==2:
-            theta = np.arctan2(to_node[1] - from_node.pos[1], to_node[0] - from_node.pos[0])
-            dist = np.linalg.norm(to_node - from_node.pos)
-            cmd_from_parent = np.array([theta, dist])
-        elif self.d == 3:
-            theta = np.arctan2(to_node[1] - from_node.pos[1], to_node[0] - from_node.pos[0])
-            phi = np.arctan2(np.linalg.norm(to_node[:2] - from_node.pos[:2]), to_node[2] - from_node.pos[2])
-            dist = np.linalg.norm(to_node - from_node.pos)
-            cmd_from_parent = np.array([theta, phi, dist])
-        return cmd_from_parent
     
-    def convert_to_cartesian(self, cmd, dist=None):
-        if dist is None:
-            dist=self.step_size
-        if self.d == 3:
-            theta = cmd[0]
-            phi = cmd[1]
-            x = dist * np.cos(theta) * np.sin(phi)
-            y = dist * np.sin(theta) * np.sin(phi)
-            z = dist * np.cos(phi)
-            return np.array([x, y, z])
-        elif self.d == 2:
-            theta = cmd[0]
-            x = dist * np.cos(theta)
-            y = dist * np.sin(theta)
-            return np.array([x, y])
 
     def collision_check(self, node):
         'check if node is in collision'
@@ -244,11 +222,11 @@ class RRT:
         for i in range(len(cmd_lst) - 1, -1, -1):
             self.actual_iterations_count += 1
             old_pos = current_pos
-            dist = cmd_lst[i][-1]
+            (unit_vector, dist) = cmd_lst[i]
             if dist < self.step_size:
-                current_pos = current_pos + self.convert_to_cartesian(cmd_lst[i], dist)
+                current_pos = current_pos + dist*unit_vector
             else:
-                current_pos = current_pos + self.convert_to_cartesian(cmd_lst[i])
+                current_pos = current_pos + self.step_size*unit_vector
             self.artists.update_resteer_solid_lines(old_pos, current_pos)
             
 
@@ -334,9 +312,9 @@ class RRT:
                 m = time.time()
 
                 # print("AREA UNDER THE CURVE using scipy integrate: ", integrate.dblquad(self.max_value_normal_distribution_function, 0, 1, lambda x: 0, lambda x: 1), "time taken: ", time.time() - m)
-                res = self.mc_integrate(self.max_value_normal_distribution_function,0,1,2)
-                print("mc_integrate", res)
-                self.mc_integrate_results.append(res)
+                # res = self.mc_integrate(self.max_value_normal_distribution_function,0,1,2)
+                # print("mc_integrate", res)
+                # self.mc_integrate_results.append(res)
         self.actual_iterations_lst.append(self.actual_iterations_count)
 
 
@@ -411,7 +389,7 @@ def collision_check(node, obstacle_list):
 
 
 if __name__ == '__main__':
-    search_space = np.array([[0, 1], [0, 1]])
+    search_space = np.array([[0, 1], [0, 1],[0,1]])
     # obstacles = [(0.1, 0.2), (0.2, 0.3), (0.3, 0.4),(0.4, 0.5),[0.5,0.6],[0.6,0.7],[0.7,0.8],[0.8,0.9], (0.9,0.1),(0.8,0.2),(0.7,0.3),(0.6,0.4),(0.5,0.5),(0.4,0.6),(0.3,0.7),(0.2,0.8),(0.1,0.9)]
     obstacles = []
     path_found_rrt = []
