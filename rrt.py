@@ -111,6 +111,19 @@ class RRT:
         self.i = 0
         self.filename = filename
         print(self.filename)
+    
+    def model(self, state, action):
+        'model for motion'
+        n, u = len(state), len(action)
+        state_dot = np.zeros(n)
+        speed, car_length = 1, 1
+        print(state)
+        state_dot[0] = action[0]*np.cos(state[2])*speed
+        state_dot[1] = action[0]*np.sin(state[2])*speed
+        state_dot[2] = action[0]*np.tan(state[3])*speed/car_length
+        state_dot[3] = action[1]
+        return state_dot
+
 
     def get_random_point(self):
         'get random point in random area'
@@ -147,8 +160,9 @@ class RRT:
         if dist < self.step_size:
             new_node = TreeNode(to_node, from_node)
         else:
-            new_node = TreeNode(from_node.pos + self.step_size * np.array([np.cos(theta), np.sin(theta)]), from_node)
-
+            # new_node = TreeNode(from_node.pos + self.step_size * np.array([np.cos(theta), np.sin(theta)]), from_node)
+            new_pos = from_node.pos + self.step_size * self.model(from_node.pos, np.array([0.01, theta]))
+            new_node = TreeNode(new_pos, from_node)
         if self.collision_check(new_node):
             from_node.children.append(new_node)
             self.node_list.append(new_node)
@@ -219,7 +233,8 @@ class RRT:
         self.ax.plot([self.root.pos[0]], [self.root.pos[1]], 'ko', ms=5)
         self.start_time = time.time()
         self.anim = animation.FuncAnimation(self.fig, self.animate, frames=self.max_iter, interval=1, blit=True)
-        self.anim.save(self.filename, fps=30, writer='imagemagick')
+        plt.show()
+        # self.anim.save(self.filename, fps=30, writer='imagemagick')
 
 
 class RRT_Opt(RRT):
@@ -246,13 +261,14 @@ class RRT_Opt(RRT):
 
 
 def generate_random_point(search_space):
-    x_min, x_max = search_space[0]
-    y_min, y_max = search_space[1]
+    res = []
+    for i in range(len(search_space)):
+        x_min, x_max = search_space[i]
 
-    x = random.uniform(x_min, x_max)
-    y = random.uniform(y_min, y_max)
+        x = random.uniform(x_min, x_max)
+        res.append(x)
 
-    return np.array([x, y])
+    return np.array(res)
 
 
 def collision_check(node, obstacle_list):
@@ -265,7 +281,7 @@ def collision_check(node, obstacle_list):
 
 
 if __name__ == '__main__':
-    search_space = np.array([[0, 1], [0, 1]])
+    search_space = np.array([[0, 1], [0, 1],[0, 1], [0, 1]])
     obstacles = [(0.1, 0.2), (0.2, 0.3), (0.3, 0.4), (0.4, 0.5), [0.5, 0.6], [0.6, 0.7], [0.7, 0.8], [0.8, 0.9],
                  (0.9, 0.1), (0.8, 0.2), (0.7, 0.3), (0.6, 0.4), (0.5, 0.5), (0.4, 0.6), (0.3, 0.7), (0.2, 0.8),
                  (0.1, 0.9)]

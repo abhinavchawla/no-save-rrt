@@ -1,31 +1,42 @@
 import numpy as np
+from matplotlib import pyplot as plt
 
-def func1(x):
-    # function f(x)= 10 + sum_i(-x_i^2)
-    # for 2D: f(x)= 10 - x1^2 - x2^2
-    return 10 + np.sum(-1*np.power(x, 2), axis=1)
-  
-def mc_integrate(func, a, b, dim, n = 1000):
-    # Monte Carlo integration of given function over domain from a to b (for each parameter)
-    # dim: dimensions of function
-    
-    x_list = np.random.uniform(a, b, (n, dim))
-    print(x_list)
-    y = func(x_list)
-    print(y)
-    
-    y_mean =  y.sum()/len(y)
-    domain = np.power(b-a, dim)
-    
-    integ = domain * y_mean
-    
-    return integ
 
-# Examples
-print("For f(x)= 10 - x1\u00b2 - x2\u00b2, integrated from -2 to 2 (for all x's)")
-print(f"Monte Carlo solution for : {mc_integrate(func1, -2, 2, 2, 1000000): .3f}")
-print(f"Analytical solution: 117.333")
+def model(state, action):
+    'model for motion'
+    n, u = len(state), len(action)
+    state_dot = np.zeros(n)
+    speed, car_length = 1, 1
+    state_dot[0] = action[0] * np.cos(state[2]) * speed
+    state_dot[1] = action[0] * np.sin(state[2]) * speed
+    state_dot[2] = np.tan(action[1]) * speed / car_length
+    return state_dot
 
-print("For f(x)= 10 - x1\u00b2 - x2\u00b2 - x3\u00b2, integrated from -2 to 2 (for all x's)")
-print(f"Monte Carlo solution: {mc_integrate(func1, -2, 2, 3, 1000000): .3f}")
-print(f"Analytical solution: 384.000")
+def get_action_list():
+    action_list = []
+    max_speed = 40
+    max_angle = 1
+    angle = - max_angle
+    speed = - max_speed
+    num_of_actions = 5
+    while speed <= max_speed:
+        while angle <= max_angle:
+            action_list.append([speed, angle])
+            angle += 2 * max_angle / num_of_actions
+        speed += 2 * max_speed / num_of_actions
+        angle = - max_angle
+    return action_list
+
+action_list = get_action_list()
+from_node = [0, 0, 0]
+for action in action_list:
+    current_node = from_node
+    points = [current_node]
+    for _ in range(10):
+        current_node = current_node + 0.01 * model(current_node, np.array(action))
+        points.append(current_node)
+    points = np.array(points)
+    plt.plot(points[:,0], points[:,1])
+    # print("current_node: ", current_node, "action:",action, "cost: ", cost)
+
+plt.show()

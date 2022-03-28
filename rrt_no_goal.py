@@ -65,13 +65,13 @@ class Artists:
         verts = [(new_pt.pos[0], new_pt.pos[1]), (old_pt.pos[0], old_pt.pos[1])]
         obs_solid_paths = self.obs_solid_lines.get_paths()
         obs_solid_paths.append(Path(verts, codes))
-    
+
     def update_resteer_solid_lines(self, old_pt, new_pt):
         codes = [Path.MOVETO, Path.LINETO]
         verts = [(new_pt[0], new_pt[1]), (old_pt[0], old_pt[1])]
         resteer_solid_paths = self.resteer_solid_lines.get_paths()
         resteer_solid_paths.append(Path(verts, codes))
-    
+
     def clear_resteer_solid_lines(self):
         self.resteer_solid_lines.get_paths().clear()
 
@@ -123,7 +123,7 @@ class RRT:
         self.current_node = None
 
         self.fig = plt.figure()
-        self.ax = plt.axes(xlim=(0, 1), ylim=(0, 1))
+        self.ax = plt.axes(xlim=(0, 600), ylim=(0, 600))
         self.artists = Artists(self.ax)
         self.node_list = [self.root]
         self.anim = None
@@ -173,16 +173,19 @@ class RRT:
 
         self.actual_iterations_count += 1
         dist = np.linalg.norm(to_node - from_node.pos)
-        unit_vector = (to_node- from_node.pos) / dist
+        unit_vector = (to_node - from_node.pos) / dist
         cmd_from_parent = (unit_vector, dist)
-        dist = cmd_from_parent[-1]
-
+        theta = np.arctan2(to_node[1] - from_node.pos[1], to_node[0] - from_node.pos[0]) - from_node.pos[2]
         if dist < self.step_size:
             new_node = TreeNode(to_node, from_node, cmd_from_parent)
         else:
-            new_node = TreeNode(from_node.pos + self.step_size*unit_vector, from_node, cmd_from_parent)
+            action = self.find_optimal_action(from_node, to_node)
+            new_node = from_node
+            for _ in range(10):
+                state_dot = self.model(new_node.pos, np.array(action))
+                new_node = TreeNode(new_node.pos + self.step_size * state_dot, new_node, cmd_from_parent)
             # new_node = TreeNode(from_node.pos + self.convert_to_cartesian(cmd_from_parent), from_node, cmd_from_parent)
-
+            # new_node = TreeNode(from_node.pos + self.step_size*unit_vector, from_node, cmd_from_parent)
         if self.collision_check(new_node):
             from_node.children.append(new_node)
             self.node_list.append(new_node)
@@ -190,7 +193,42 @@ class RRT:
         else:
             return None
 
-    
+    def find_optimal_action(self, from_node, to_node):
+        'find optimal action'
+
+        min_cost = float('inf')
+        min_action = None
+        action_list = self.get_action_list()
+        print("to_node: ", to_node, "from_node: ", from_node.pos, len(action_list))
+        for action in action_list:
+            current_node = from_node.pos
+            points = [current_node]
+            for _ in range(10):
+                current_node = current_node + self.step_size * self.model(current_node, np.array(action))
+                points.append(current_node)
+            cost = np.linalg.norm(current_node - to_node)
+            points = np.array(points)
+            # plt.plot(points[:,0], points[:,1])
+            # print("current_node: ", current_node, "action:",action, "cost: ", cost)
+            if cost < min_cost:
+                min_cost = cost
+                min_action = action
+        return min_action
+
+    def get_action_list(self):
+        action_list = []
+        max_speed = 40
+        max_angle = 1
+        angle = - max_angle
+        speed = - max_speed
+        num_of_actions = 5
+        while speed <= max_speed:
+            while angle <= max_angle:
+                action_list.append([speed, angle])
+                angle += 2 * max_angle / num_of_actions
+            speed += 2 * max_speed / num_of_actions
+            angle = - max_angle
+        return action_list
 
     def collision_check(self, node):
         'check if node is in collision'
@@ -204,8 +242,8 @@ class RRT:
         'iterate RRT algorithm'
         random_pt = self.get_random_point()
         nearest_node = self.get_nearest_node(random_pt)
-        if nearest_node is not self.current_node:
-            self.steerFromRoot(nearest_node)
+        # if nearest_node is not self.current_node:
+        #     self.steerFromRoot(nearest_node)
         new_node = self.steer(nearest_node, random_pt)
         self.current_node = new_node
         self.update_coverages(new_node)
@@ -217,21 +255,17 @@ class RRT:
         while node is not None and node is not self.root:
             cmd_lst.append(node.cmd_from_parent)
             node = node.parent
-        
+
         current_pos = self.root.pos
         for i in range(len(cmd_lst) - 1, -1, -1):
             self.actual_iterations_count += 1
             old_pos = current_pos
             (unit_vector, dist) = cmd_lst[i]
             if dist < self.step_size:
-                current_pos = current_pos + dist*unit_vector
+                current_pos = current_pos + dist * unit_vector
             else:
-                current_pos = current_pos + self.step_size*unit_vector
+                current_pos = current_pos + self.step_size * unit_vector
             self.artists.update_resteer_solid_lines(old_pos, current_pos)
-            
-
-
-
 
     def update_path(self, new_node):
         self.path_found = True
@@ -245,7 +279,6 @@ class RRT:
         self.artists.update_path_to_goal(self.path)
 
     def return_results(self):
-        self.path_length
         return self.path_found, self.path_length, self.time_taken, self.total_nodes
 
     def get_dist(self, node, goal):
@@ -261,13 +294,20 @@ class RRT:
 
     def animate(self, i):
         'animation function'
+        if i == self.max_iter - 1:
+            print('max iterations reached')
+            self.artists.clear_resteer_solid_lines()
+            self.artists.update_rand_pt_marker([0, 0])
+            self.path_found = True
         if not self.path_found:
             # time.sleep(0.5)
-            self.artists.clear_resteer_solid_lines()
+            # self.artists.clear_resteer_solid_lines()
             random_pt, nearest_node, new_node = self.iterate()
             print('iteration: ', i, 'test_pts found: ', self.cnt, 'actual_iterations: ', self.actual_iterations_count)
             self.artists.update_rand_pt_marker(random_pt)
+            print("new_node: ", new_node.pos)
             if new_node and nearest_node:
+                print("reached here")
                 self.artists.update_obs_solid_lines(nearest_node, new_node)
         return self.artists.artist_list
 
@@ -278,7 +318,8 @@ class RRT:
         self.start_time = time.time()
         # for i in range(self.max_iter):
         #     self.animate(i)
-        self.anim = animation.FuncAnimation(self.fig, self.animate, frames=self.max_iter,interval=1, blit=True)
+        self.anim = animation.FuncAnimation(self.fig, self.animate, frames=self.max_iter, interval=1, blit=True)
+        # plt.savefig(self.filename)
         plt.show()
         # self.anim.save(self.filename, writer=animation.FFMpegWriter(fps=30))        
 
@@ -288,8 +329,8 @@ class RRT:
 
     def plot_results(self, ax, color='r-'):
         'plot results'
-        ax.plot(np.arange(0, len(self.actual_iterations_lst)), self.actual_iterations_lst, color)
-    
+        ax.plot(self.actual_iterations_lst, np.arange(0, len(self.actual_iterations_lst)), color)
+
     def update_coverages(self, new_node):
         if new_node:
             if self.goal:
@@ -306,7 +347,7 @@ class RRT:
                         tmp.append(pt)
                 self.test_points = tmp
                 self.test_points_found_count.append(self.cnt)
-                variance = 0.01*np.identity(len(new_node.pos))
+                variance = 0.01 * np.identity(len(new_node.pos))
                 self.normal_distribution_array.append(self.create_normal_distribution(new_node.pos, variance))
 
                 m = time.time()
@@ -317,7 +358,6 @@ class RRT:
                 # self.mc_integrate_results.append(res)
         self.actual_iterations_lst.append(self.actual_iterations_count)
 
-
     def max_value_normal_distribution_function(self, args):
         val = 0.0
         for distribution in self.normal_distribution_array:
@@ -327,22 +367,32 @@ class RRT:
     def create_normal_distribution(self, mean, std):
         'create normal distribution'
         return stats.multivariate_normal(mean, std)
-    
-    def mc_integrate(self,func, a, b, dim, n = 1000):
+
+    def mc_integrate(self, func, a, b, dim, n=1000):
         # Monte Carlo integration of given function over domain from a to b (for each parameter)
         # dim: dimensions of function
-        
+
         x_list = np.random.uniform(a, b, (n, dim))
-        sm=0
+        sm = 0
         for i in x_list:
-            sm+=func(i)
-        
-        y_mean =  sm/n
-        domain = np.power(b-a, dim)
-        
+            sm += func(i)
+
+        y_mean = sm / n
+        domain = np.power(b - a, dim)
+
         integ = domain * y_mean
-        
+
         return integ
+
+    def model(self, state, action):
+        'model for motion'
+        n, u = len(state), len(action)
+        state_dot = np.zeros(n)
+        speed, car_length = 1, 1
+        state_dot[0] = action[0] * np.cos(state[2]) * speed
+        state_dot[1] = action[0] * np.sin(state[2]) * speed
+        state_dot[2] = np.tan(action[1]) * speed / car_length
+        return state_dot
 
 
 class RRT_Opt(RRT):
@@ -389,7 +439,7 @@ def collision_check(node, obstacle_list):
 
 
 if __name__ == '__main__':
-    search_space = np.array([[0, 1], [0, 1],[0,1]])
+    search_space = np.array([[0, 600], [0, 600], [-1, 1]])
     # obstacles = [(0.1, 0.2), (0.2, 0.3), (0.3, 0.4),(0.4, 0.5),[0.5,0.6],[0.6,0.7],[0.7,0.8],[0.8,0.9], (0.9,0.1),(0.8,0.2),(0.7,0.3),(0.6,0.4),(0.5,0.5),(0.4,0.6),(0.3,0.7),(0.2,0.8),(0.1,0.9)]
     obstacles = []
     path_found_rrt = []
@@ -404,10 +454,10 @@ if __name__ == '__main__':
     test_points = []
     d = len(search_space)
     for i in range(1000):
-        test_points.append(generate_random_point(search_space,d))
+        test_points.append(generate_random_point(search_space, d))
 
-    for test in range(2):
-        start = generate_random_point(search_space,d)
+    for test in range(1):
+        start = generate_random_point(search_space, d)
         goal = generate_random_point(search_space, d)
         print("start: ", start, "goal: ", goal)
         while not collision_check(start, obstacles):
@@ -417,25 +467,27 @@ if __name__ == '__main__':
             print('goal in collision')
             goal = generate_random_point(search_space)
         print('Distance between start and goal ', np.linalg.norm(start - goal))
-        rrtsearch = RRT(start, None, [], search_space, 0.01, 5000, 0.03, 'cache/rrt_' + str(test) + '.gif', test_points)
+        rrtsearch = RRT(start, None, [], search_space, 0.01, 10000, 0.03, 'cache/rrt_' + str(test) + '.png',
+                        test_points)
         rrtsearch.run()
 
-        rrtsearch2 = RRT_Opt(start, None, [], search_space, 0.01, 5000, 0.03, 'cache/rrt_opt_' + str(test) + '.gif',
-                             test_points)
-        rrtsearch2.run()
+        # rrtsearch2 = RRT_Opt(start, None, [], search_space, 0.01, 3000, 0.03, 'cache/rrt_opt_' + str(test) + '.png',
+        #                      test_points)
+        # rrtsearch2.run()
 
-        ax = plt.subplot(211)
+        # fig,ax = plt.subplots()
+        # ax.set_xlim(0,10000)
+        # ax.set_ylim(0,3000)
 
-        ax.set_xlabel('Nodes found')
-        ax.set_ylabel('Total Simulation Time')
-        rrtsearch.plot_results(ax, 'r-')
-        rrtsearch2.plot_results(ax, 'b-')
-        ax.legend(['RRT', 'RRT_No_Save'])
+        # ax.set_ylabel('Nodes found')
+        # ax.set_xlabel('Simulation Time')
+        # rrtsearch.plot_results(ax, 'r-')
+        # rrtsearch2.plot_results(ax, 'b-')
+        # ax.legend(['RRT', 'RRT_No_Save'])
 
-        ax1 = plt.subplot(212)
-        ax1.set_xlabel('Nodes found')
-        ax1.set_ylabel('Area under the curve')
+        # ax1 = plt.subplot(212)
+        # ax1.set_xlabel('Nodes found')
+        # ax1.set_ylabel('Area under the curve')
         # rrtsearch.plot_results_area(ax1, 'r-')
         # rrtsearch2.plot_results_area(ax1, 'b-')
-        ax1.legend(['RRT', 'RRT_No_Save'])
-        fig.savefig('cache/rrt_' + str(test) + '.png')
+        # ax1.legend(['RRT', 'RRT_No_Save'])
