@@ -21,6 +21,9 @@ class Artists:
         self.goal_pt_marker, = ax.plot([], [], '--o', color='red', lw=1, zorder=2)
         self.artist_list.append(self.goal_pt_marker)
 
+        self.nearest_node_marker, = ax.plot([], [], '--o', color='red', lw=1, zorder=2)
+        self.artist_list.append(self.nearest_node_marker)
+
         self.root_pt_marker, = ax.plot([], [], '--o', color='blue', lw=1, zorder=2)
         self.artist_list.append(self.root_pt_marker)
 
@@ -51,6 +54,14 @@ class Artists:
         ys = [goal_pt[1]]
 
         self.goal_pt_marker.set_data(xs, ys)
+
+    def update_nearest_node_marker(self, nearest_node):
+        'update goal point marker'
+
+        xs = [nearest_node[0]]
+        ys = [nearest_node[1]]
+
+        self.nearest_node_marker.set_data(xs, ys)
 
     def update_root_pt_marker(self, root_pt):
         'update root point marker'
@@ -175,23 +186,22 @@ class RRT:
         dist = np.linalg.norm(to_node - from_node.pos)
         unit_vector = (to_node - from_node.pos) / dist
         cmd_from_parent = (unit_vector, dist)
-        theta = np.arctan2(to_node[1] - from_node.pos[1], to_node[0] - from_node.pos[0]) - from_node.pos[2]
         if dist < self.step_size:
             new_node = TreeNode(to_node, from_node, cmd_from_parent)
         else:
             action = self.find_optimal_action(from_node, to_node)
             new_node = from_node
+            prev_node = new_node
             for _ in range(10):
                 state_dot = self.model(new_node.pos, np.array(action))
-                new_node = TreeNode(new_node.pos + self.step_size * state_dot, new_node, cmd_from_parent)
-            # new_node = TreeNode(from_node.pos + self.convert_to_cartesian(cmd_from_parent), from_node, cmd_from_parent)
-            # new_node = TreeNode(from_node.pos + self.step_size*unit_vector, from_node, cmd_from_parent)
-        if self.collision_check(new_node):
-            from_node.children.append(new_node)
-            self.node_list.append(new_node)
-            return new_node
-        else:
-            return None
+                new_node = TreeNode(new_node.pos + self.step_size * state_dot, prev_node, cmd_from_parent)
+                if self.collision_check(new_node):
+                    prev_node.children.append(new_node)
+                self.artists.update_obs_solid_lines(prev_node, new_node)
+                prev_node = new_node
+                self.node_list.append(new_node)
+        return new_node
+
 
     def find_optimal_action(self, from_node, to_node):
         'find optimal action'
@@ -207,21 +217,20 @@ class RRT:
                 current_node = current_node + self.step_size * self.model(current_node, np.array(action))
                 points.append(current_node)
             cost = np.linalg.norm(current_node - to_node)
-            points = np.array(points)
-            # plt.plot(points[:,0], points[:,1])
-            # print("current_node: ", current_node, "action:",action, "cost: ", cost)
+            # print("cost: ", cost, "action: ", action, "new_node: ", current_node)
             if cost < min_cost:
                 min_cost = cost
                 min_action = action
+        print("min_cost: ", min_cost, "min_action: ", min_action, "new_node: ", current_node)
         return min_action
 
     def get_action_list(self):
         action_list = []
         max_speed = 40
-        max_angle = 1
+        max_angle = np.pi / 4
         angle = - max_angle
-        speed = - max_speed
-        num_of_actions = 5
+        speed = 0
+        num_of_actions = 10
         while speed <= max_speed:
             while angle <= max_angle:
                 action_list.append([speed, angle])
@@ -305,10 +314,10 @@ class RRT:
             random_pt, nearest_node, new_node = self.iterate()
             print('iteration: ', i, 'test_pts found: ', self.cnt, 'actual_iterations: ', self.actual_iterations_count)
             self.artists.update_rand_pt_marker(random_pt)
+            self.artists.update_nearest_node_marker(nearest_node.pos)
             print("new_node: ", new_node.pos)
-            if new_node and nearest_node:
-                print("reached here")
-                self.artists.update_obs_solid_lines(nearest_node, new_node)
+            # if new_node and nearest_node:
+            #     self.artists.update_obs_solid_lines(nearest_node, new_node)
         return self.artists.artist_list
 
     def run(self):
@@ -392,6 +401,7 @@ class RRT:
         state_dot[0] = action[0] * np.cos(state[2]) * speed
         state_dot[1] = action[0] * np.sin(state[2]) * speed
         state_dot[2] = np.tan(action[1]) * speed / car_length
+
         return state_dot
 
 
