@@ -143,7 +143,7 @@ def DMD(X, U, rank):
 
     AA = np.linalg.multi_dot((X2, np.transpose(W), np.diag(np.divide(1, S)), np.transpose(V)))
 
-    # devide into state matrix and input matrix
+    # divide into state matrix and input matrix
 
     B = AA[:, AA.shape[0]: AA.shape[1]]
     A = AA[:, 0: AA.shape[0]]
@@ -228,8 +228,10 @@ def Test(init_test_state, test_cmds, A, B, num_observables, WF, BF):
     outx = np.array(outx)
     # print(outx.shape)
     # print(outx, init_test_state[0,:])
-    # rms = mean_squared_error(outx, init_test_state[0, :], squared=False)
-    # print("ROOT MEAN SQUARE ERROR: ", rms)
+    rms1 = mean_squared_error(np.array(outx)[:,0], init_test_state[0, :])
+    rms2 = mean_squared_error(np.array(outx)[:,1], init_test_state[1, :])
+
+    print("ROOT MEAN SQUARE ERROR: ", rms1, rms2)
     # fig,ax = plt.subplots(3)
     # ax[0].plot(outx[:, 0], '--', color="r")
     # ax[0].plot(init_test_state[0, :], '.', color="b")
@@ -277,7 +279,7 @@ def main():
     A, B = DMD(XP, cmds, rank)  # Koopman operators
 
     for i in range(10):
-        Test(test_states[i], test_cmds[i], A, B, num_observables, WF, BF)
+        Test(states[i], cmds[i], A, B, num_observables, WF, BF)
     plt.show()
 
 if __name__ == "__main__":
