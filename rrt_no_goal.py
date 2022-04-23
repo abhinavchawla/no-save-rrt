@@ -24,6 +24,9 @@ class Artists:
         self.root_pt_marker, = ax.plot([], [], '--o', color='blue', lw=1, zorder=2)
         self.artist_list.append(self.root_pt_marker)
 
+        self.nearest_pt_marker, = ax.plot([], [], '--o', color='orange', lw=1, zorder=2)
+        self.artist_list.append(self.nearest_pt_marker)
+
         self.obs_solid_lines = LineCollection([], lw=2, animated=True, color='k', zorder=1)
         ax.add_collection(self.obs_solid_lines)
         self.artist_list.append(self.obs_solid_lines)
@@ -43,6 +46,14 @@ class Artists:
         ys = [rand_pt[1]]
 
         self.rand_pt_marker.set_data(xs, ys)
+
+    def update_nearest_pt_marker(self, nearest_pt):
+        'update random point marker'
+
+        xs = [nearest_pt[0]]
+        ys = [nearest_pt[1]]
+
+        self.nearest_pt_marker.set_data(xs, ys)
 
     def update_goal_pt_marker(self, goal_pt):
         'update goal point marker'
@@ -204,6 +215,7 @@ class RRT:
         'iterate RRT algorithm'
         random_pt = self.get_random_point()
         nearest_node = self.get_nearest_node(random_pt)
+        self.artists.update_nearest_pt_marker(nearest_node.pos)
         if nearest_node is not self.current_node:
             self.steerFromRoot(nearest_node)
         new_node = self.steer(nearest_node, random_pt)
@@ -262,7 +274,6 @@ class RRT:
     def animate(self, i):
         'animation function'
         if not self.path_found:
-            # time.sleep(0.5)
             self.artists.clear_resteer_solid_lines()
             random_pt, nearest_node, new_node = self.iterate()
             print('iteration: ', i, 'test_pts found: ', self.cnt, 'actual_iterations: ', self.actual_iterations_count)
@@ -357,6 +368,7 @@ class RRT_Opt(RRT):
                                                                                       self.current_rand_pt) < self.tolerance / 3:
             self.current_rand_pt = self.get_random_point()
             nearest_node = self.get_nearest_node(self.current_rand_pt)
+            self.artists.update_nearest_pt_marker(nearest_node.pos)
             if nearest_node != self.current_node:
                 self.steerFromRoot(nearest_node)
             self.current_node = nearest_node
@@ -389,7 +401,7 @@ def collision_check(node, obstacle_list):
 
 
 if __name__ == '__main__':
-    search_space = np.array([[0, 1], [0, 1],[0,1]])
+    search_space = np.array([[0, 1], [0, 1]])
     # obstacles = [(0.1, 0.2), (0.2, 0.3), (0.3, 0.4),(0.4, 0.5),[0.5,0.6],[0.6,0.7],[0.7,0.8],[0.8,0.9], (0.9,0.1),(0.8,0.2),(0.7,0.3),(0.6,0.4),(0.5,0.5),(0.4,0.6),(0.3,0.7),(0.2,0.8),(0.1,0.9)]
     obstacles = []
     path_found_rrt = []
